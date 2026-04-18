@@ -13,21 +13,37 @@
   }
 }
 
-@layer components {
-  .setting-gen-ed { @apply bg-emerald-100 border-emerald-400; }
-  .setting-sped { @apply bg-indigo-100 border-indigo-400; }
-  .setting-ot { @apply bg-amber-100 border-amber-400; }
-  .setting-speech { @apply bg-rose-100 border-rose-400; }
-  .setting-lunch { @apply bg-slate-200 border-slate-400; }
-  .setting-specials { @apply bg-sky-100 border-sky-400; }
-}
-
 @media print {
-  .no-print { display: none !important; }
-  .print-only { display: block !important; }
-  @page { size: letter; margin: 0.5in; }
-  body { @apply bg-white; }
-  .block-card { break-inside: avoid; }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+  @page {
+    size: letter landscape;
+    margin: 0.3in;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  input,
+  textarea,
+  select {
+    border: none !important;
+    background: transparent !important;
+    color: black !important;
+  }
+  /* Ensure background colors print in Chromium/WebKit */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
-
-.print-only { display: none; }
