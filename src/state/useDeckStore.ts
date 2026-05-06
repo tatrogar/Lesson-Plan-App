@@ -3,6 +3,12 @@ import { persist } from "zustand/middleware";
 import type { Card, Grade, Word } from "../types";
 import { applyGrade, newCard } from "../lib/sm2";
 import { isDue, todayIso } from "../lib/date";
+import {
+  findOrCreateGist,
+  pullGist,
+  pushGist,
+  verifyToken,
+} from "../lib/gist";
 
 type State = {
   words: Word[];
@@ -10,6 +16,11 @@ type State = {
   introducedWordIds: string[];
   lastReviewDate: string | null;
   reviewedToday: number;
+  syncToken: string | null;
+  syncGistId: string | null;
+  syncLogin: string | null;
+  lastPushedAt: string | null;
+  lastPulledAt: string | null;
 };
 
 type Actions = {
@@ -20,6 +31,10 @@ type Actions = {
   exportJson: () => string;
   importJson: (text: string) => boolean;
   dueCardIds: (today?: string) => string[];
+  connectSync: (token: string) => Promise<void>;
+  disconnectSync: () => void;
+  pushToCloud: () => Promise<void>;
+  pullFromCloud: () => Promise<void>;
 };
 
 export type DeckStore = State & Actions;
@@ -30,7 +45,26 @@ const initialState: State = {
   introducedWordIds: [],
   lastReviewDate: null,
   reviewedToday: 0,
+  syncToken: null,
+  syncGistId: null,
+  syncLogin: null,
+  lastPushedAt: null,
+  lastPulledAt: null,
 };
+
+function buildExport(s: State): string {
+  return JSON.stringify(
+    {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      words: s.words,
+      cards: s.cards,
+      introducedWordIds: s.introducedWordIds,
+    },
+    null,
+    2,
+  );
+}
 
 export const useDeckStore = create<DeckStore>()(
   persist(
@@ -95,16 +129,15 @@ export const useDeckStore = create<DeckStore>()(
         });
       },
 
-      resetAll: () => set({ ...initialState }),
+      resetAll: () =>
+        set({
+          ...initialState,
+          syncToken: get().syncToken,
+          syncGistId: get().syncGistId,
+          syncLogin: get().syncLogin,
+        }),
 
-      exportJson: () => {
-        const { words, cards, introducedWordIds } = get();
-        return JSON.stringify(
-          { version: 1, words, cards, introducedWordIds },
-          null,
-          2,
-        );
-      },
+      exportJson: () => buildExport(get()),
 
       importJson: (text) => {
         try {
@@ -132,6 +165,42 @@ export const useDeckStore = create<DeckStore>()(
         return Object.values(cards)
           .filter((c) => isDue(c.dueDate, t))
           .map((c) => c.id);
+      },
+
+      connectSync: async (token) => {
+        const login = await verifyToken(token);
+        const gistId = await findOrCreateGist(token);
+        set({ syncToken: token, syncGistId: gistId, syncLogin: login });
+      },
+
+      disconnectSync: () =>
+        set({ syncToken: null, syncGistId: null, syncLogin: null }),
+
+      pushToCloud: async () => {
+        const { syncToken, syncGistId } = get();
+        if (!syncToken || !syncGistId) throw new Error("Not connected");
+        await pushGist(syncToken, syncGistId, buildExport(get()));
+        set({ lastPushedAt: new Date().toISOString() });
+      },
+
+      pullFromCloud: async () => {
+        const { syncToken, syncGistId } = get();
+        if (!syncToken || !syncGistId) throw new Error("Not connected");
+        const text = await pullGist(syncToken, syncGistId);
+        const parsed = JSON.parse(text);
+        if (!parsed || typeof parsed !== "object")
+          throw new Error("Cloud data is empty or invalid");
+        set({
+          words: Array.isArray(parsed.words) ? parsed.words : [],
+          cards:
+            parsed.cards && typeof parsed.cards === "object"
+              ? parsed.cards
+              : {},
+          introducedWordIds: Array.isArray(parsed.introducedWordIds)
+            ? parsed.introducedWordIds
+            : [],
+          lastPulledAt: new Date().toISOString(),
+        });
       },
     }),
     {
