@@ -3,6 +3,7 @@ import { useDeckStore } from "../state/useDeckStore";
 import type { Grade } from "../types";
 import { todayIso } from "../lib/date";
 import { CardView } from "./CardView";
+import { TeachingPage } from "./TeachingPage";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -12,6 +13,8 @@ function shuffle<T>(arr: T[]): T[] {
   }
   return a;
 }
+
+type Phase = "review" | "teaching" | "done";
 
 export function ReviewSession() {
   const cards = useDeckStore((s) => s.cards);
@@ -24,15 +27,19 @@ export function ReviewSession() {
   );
 
   const [queue, setQueue] = useState<string[]>([]);
+  const [missed, setMissed] = useState<string[]>([]);
   const [flipped, setFlipped] = useState(false);
   const [done, setDone] = useState(0);
+  const [phase, setPhase] = useState<Phase>("review");
 
   useEffect(() => {
     const today = todayIso();
     const due = Object.values(cards)
       .filter((c) => c.dueDate <= today)
       .map((c) => c.id);
-    setQueue(shuffle(due));
+    const initial = shuffle(due);
+    setQueue(initial);
+    if (initial.length === 0) setPhase("done");
   }, []);
 
   const currentId = queue[0];
@@ -41,13 +48,16 @@ export function ReviewSession() {
 
   const onGrade = (grade: Grade) => {
     if (!card) return;
-    const isLapse = grade === "again";
     gradeCard(card.id, grade);
+    if (grade === "wrong") {
+      setMissed((m) => [...m, card.id]);
+    }
     setQueue((q) => {
-      const [, ...rest] = q;
-      if (isLapse) {
-        const insertAt = Math.min(rest.length, Math.max(2, 3));
-        return [...rest.slice(0, insertAt), card.id, ...rest.slice(insertAt)];
+      const rest = q.slice(1);
+      if (rest.length === 0) {
+        const willHaveMissed =
+          grade === "wrong" ? missed.length + 1 : missed.length;
+        setPhase(willHaveMissed > 0 ? "teaching" : "done");
       }
       return rest;
     });
@@ -55,7 +65,19 @@ export function ReviewSession() {
     setFlipped(false);
   };
 
-  if (!card || !word) {
+  if (phase === "teaching") {
+    return (
+      <TeachingPage
+        cardIds={missed}
+        onDone={() => {
+          setPhase("done");
+          window.location.hash = "#/";
+        }}
+      />
+    );
+  }
+
+  if (phase === "done" || !card || !word) {
     return (
       <div className="mx-auto max-w-md p-6 space-y-4 text-center">
         <h1 className="text-2xl font-bold mt-12">All done!</h1>
@@ -102,10 +124,10 @@ export function ReviewSession() {
         {flipped ? (
           <div className="grid grid-cols-4 gap-2 max-w-md mx-auto">
             <GradeButton
-              label="Again"
-              hint="<1m"
+              label="Wrong"
+              hint="1d"
               color="bg-rose-600"
-              onClick={() => onGrade("again")}
+              onClick={() => onGrade("wrong")}
             />
             <GradeButton
               label="Hard"

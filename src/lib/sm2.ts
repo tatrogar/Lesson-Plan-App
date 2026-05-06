@@ -26,14 +26,19 @@ export function newCard(
 export function applyGrade(card: Card, grade: Grade, today: string): Card {
   const next: Card = { ...card, lastReviewed: today };
 
-  if (card.state === "new" || card.state === "learning") {
-    if (grade === "again") {
-      next.state = "learning";
-      next.repetitions = 0;
-      next.interval = 0;
-      next.dueDate = today;
-      return next;
+  if (grade === "wrong") {
+    next.state = "learning";
+    next.repetitions = 0;
+    next.interval = 1;
+    next.dueDate = addDays(today, 1);
+    if (card.state === "review") {
+      next.easeFactor = Math.max(EASE_MIN, card.easeFactor - 0.2);
+      next.lapses = card.lapses + 1;
     }
+    return next;
+  }
+
+  if (card.state === "new" || card.state === "learning") {
     if (grade === "hard") {
       next.state = "review";
       next.interval = 1;
@@ -52,16 +57,6 @@ export function applyGrade(card: Card, grade: Grade, today: string): Card {
     next.interval = 4;
     next.repetitions = 1;
     next.dueDate = addDays(today, 4);
-    return next;
-  }
-
-  if (grade === "again") {
-    next.state = "learning";
-    next.repetitions = 0;
-    next.interval = 0;
-    next.easeFactor = Math.max(EASE_MIN, card.easeFactor - 0.2);
-    next.lapses = card.lapses + 1;
-    next.dueDate = today;
     return next;
   }
 

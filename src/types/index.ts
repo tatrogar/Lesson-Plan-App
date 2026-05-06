@@ -10,7 +10,7 @@ export type Word = {
 
 export type Direction = "es-to-en" | "en-to-es";
 export type CardState = "new" | "learning" | "review";
-export type Grade = "again" | "hard" | "good" | "easy";
+export type Grade = "wrong" | "hard" | "good" | "easy";
 
 export type Card = {
   id: string;

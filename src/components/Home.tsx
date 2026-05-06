@@ -34,7 +34,7 @@ export function Home() {
   return (
     <div className="mx-auto max-w-md p-6 space-y-6">
       <header>
-        <h1 className="text-3xl font-bold">Spanish Leitner</h1>
+        <h1 className="text-3xl font-bold">Today's Lesson</h1>
         <p className="text-slate-500 text-sm mt-1">
           {words.length === 0
             ? "Start by importing your word list."
